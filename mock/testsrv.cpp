@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <dlfcn.h>
-
 namespace testing
 {
     class testclass
@@ -26,10 +24,6 @@ int main()
 {
 
     printf("~~~~~ Hello, I am a mock service (%d).\n", getpid());
-
-    //dlopen("../apinject", 1);
-
-    //printf("%s", dlerror());
 
     testing::testclass *test = new testing::testclass();
 
