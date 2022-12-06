@@ -28,83 +28,10 @@
 # can be debugged by using this (gdb won't work as we use ptrace):
 # export LD_DEBUG=all
 
-.macro pushaq
-    push rsp                    # stack pointer first
-    push rbp
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rdx    
-    push rcx
-    push rbx
- #   push rax                   # exclude accumulator
-    push rsi
-    push rdi
-.endm # pushaq
-
-.macro popaq
-    pop rdi
-    pop rsi
- #   pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15       
-    pop rbp
-    pop rsp
-.endm
-
-# this is just some macro which can be used for quick and stupid print debugging.
-# if you not uncomment the lines below, macro shouldn't be included in the final
-# binary, that makes it more convident for me than functions
-.macro debug_print
-        pushaq
-        push rax
-        mov  rax, 0x0a786148646162  # put badHax on stack
-        push rax
-        mov  rdx, 0x8               # atack string length
-        mov  rsi, rsp               # put addr of the stack string into rsi
-        mov  rax, 0x1               # syscall 1 is write()
-        mov  rdi, 0x1               # stdout = fd 1
-        syscall                     # call kernel
-        pop rax
-        pop rax
-        popaq
-.endm
-
-.macro debug_print_path
-    pushaq
-    mov rdx, [r15+8]            # length
-    mov rsi, r15                # add base of data to rsi
-    add rsi, 16                 # add +16 to point to the path 
-    mov rax, 1                  # syscall number
-    mov rdi, 1                  # stdout = fd 1
-    syscall                     # call kernel   
-    popaq
-.endm
-
 payload_loader:
         nop                         # these protect us from weird shifting issues
         nop
         call .Lget_rip              # quickly snitch the value of rip
-
-        # xor ebp,ebp
-        # push rax
-        # push rsp
-        # push rbp
-        # mov rbp, rsp
 
         sub rax, 0x107 # 105        # calculate a pointer to *data[] is in rax, data is located at 
                                     # -254 bytes (0x100) from current rip and off by 5 because 
@@ -121,9 +48,7 @@ payload_loader:
         mov rdi, r15                # mov base of data to edi
         add rdi, 16                 # add +16 to point to make rdi contain pointer to the path 
 
-        mov rsi, 1 # 0x00102            # RTLD_NOW | RTLD_GLOBAL 
-
-        # debug_print_path
+        mov rsi, 0x00102            # RTLD_NOW | RTLD_GLOBAL 
         
         call rbx                    # __libc_dlopen_mode
 
