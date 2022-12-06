@@ -18,75 +18,44 @@
 
 #include "apinject.h"
 
+// injector stages
+void stage_one();
+void stage_two(pid_t pid);
+
+const char interp_path[] __attribute__((section(".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+
 /*
-    Constructor which is fully run once we injected ourself into
-    the target process. This is the entry point inside the target
-    process. See this as the second main(), just inside the target.
+    This is the constructor which launches the two stages of the loader: 
+    stage one: setup the shellcode and execute it in targets adress space
+    stage two: constructor run after dlopen loaded the binary into the target
 */
 
-void __attribute__((__constructor__)) we_are_in(void)
+static void launcher() __attribute__((__constructor__));
+static void launcher()
 {
-    print_line("constructor executed", YEL);
-
-    pid_t mbts_pid;
-
-    char myself[BUFSIZ];
-
-    mbts_pid = proc_get_pid(MY_TARGET, false);
+    pid_t pid = proc_get_pid(MY_TARGET, false);
 
     // check if we are already injected into target
 
-    if (mbts_pid == getpid())
+    if (pid == getpid())
     {
-
-        print_line("Here's Johnny!!!", YEL);
-
-        if (!readlink("/proc/self/exe", myself, BUFSIZ))
-        {
-            print_line("readlink failed!", RED);
-            exit(1);
-        }
-
-        print_line("whoami (%s)", GRN, myself);
-
-        print_line("getting symbol offset", GRN);
-        long unsigned func_offset = get_offset_from_elf(myself, MY_TARGET_FUNC);
-
-        if (func_offset == 0)
-        {
-            print_line("no offset found", RED);
-            exit(1);
-        }
-
-        print_line("getting image base in memory", GRN);
-
-        long unsigned target_image = proc_get_image(-1, MY_TARGET, 0, false);
-
-        // fork and spawn a debugger child which debugs the main thread and
-        // controls execution
-        if (fork() == 0)
-        {
-
-            // here we are in the new child
-            print_line("spawned debug child (pid: %d)", GRN, getpid());
-
-            spawn_debug_monitor(mbts_pid, (target_image + func_offset));
-        }
-
-        // we are done in the main thread
-        print_line("done (%d).", GRN, getpid());
+        stage_two(pid);
+    }
+    else
+    {
+        stage_one();
     }
 }
 
 // extern for asm stub
 extern void payload_loader();
 
-int main(int argc, char *argv[])
+void stage_one()
 {
     struct user_regs_struct regs;        // register dump of mbts
     struct user_regs_struct backup_regs; //
 
-    pid_t mbts_pid;  // pid of mbts
+    pid_t pid;  // pid of mbts
     int mbts_status; // status after waitpid/break
 
     unsigned long data[ARRSIZE];
@@ -101,24 +70,27 @@ int main(int argc, char *argv[])
 
     print_info();
 
-    signal(SIGSEGV, clean_exit_on_sig); 
+    // set handler for segfaults
+    signal(SIGSEGV, clean_exit_on_sig);
 
-    mbts_pid = proc_get_pid(MY_TARGET, false);
+    // get PID of target
+    pid = proc_get_pid(MY_TARGET, false);
 
-    if (mbts_pid == 0)
+    if (pid == 0)
     {
         print_line("unable to find PID of target", RED);
         exit(0);
     }
 
-    if (mbts_pid == getpid())
+    if (pid == getpid())
     {
         exit(0);
     }
 
-    print_line("target has PID %i", GRN, mbts_pid);
+    print_line("target has PID %i", GRN, pid);
 
-    get_libc_addrs(mbts_pid);
+    // get libc addr
+    get_libc_addrs(pid);
 
 #if defined(__GLIBC__) && __GLIBC__ == 2 && __GLIBC_MINOR__ < 34
     data[0] = get_func_remote("__libc_dlopen_mode");
@@ -126,9 +98,11 @@ int main(int argc, char *argv[])
     data[0] = get_func_remote("dlopen");
 #endif
 
-    attach_to_pid(mbts_pid);
+    // ptrace attach
+    attach_to_pid(pid);
 
-    get_registers(mbts_pid, &regs);
+    // get registers
+    get_registers(pid, &regs);
 
     // backup all regs for later restore
     backup_regs = regs;
@@ -158,7 +132,7 @@ int main(int argc, char *argv[])
     /*
         -> this is the boring way which uses proc to find an exacutable page to write to
     */
-    target_addr = proc_get_image(mbts_pid, "", 0, false);
+    target_addr = proc_get_image(pid, "", 0, false);
 #endif
 
     if (target_addr == 0)
@@ -171,33 +145,33 @@ int main(int argc, char *argv[])
     // backup current register content
     print_line("backing up previous content (%p)", GRN, (void *)target_addr);
     block_backup = (unsigned char *)malloc(MEMBLOCKSIZE);
-    peek(mbts_pid, target_addr, block_backup, MEMBLOCKSIZE);
+    peek(pid, target_addr, block_backup, MEMBLOCKSIZE);
 
 #if DEBUG
-    peek_debug(mbts_pid, target_addr, DEBUG_PEEK);
+    peek_debug(pid, target_addr, DEBUG_PEEK);
 #endif
 
     // adding our data at base
     print_line("adding our data to remote memory (%p)", GRN, (void *)target_addr);
-    current_offset = poke(mbts_pid, target_addr, (void *)&data, (ARRSIZE * sizeof(unsigned long)));
+    current_offset = poke(pid, target_addr, (void *)&data, (ARRSIZE * sizeof(unsigned long)));
 
 #if DEBUG
-    peek_debug(mbts_pid, target_addr, DEBUG_PEEK);
+    peek_debug(pid, target_addr, DEBUG_PEEK);
 #endif
 
     // add string with the path to the library right after our data
     print_line("adding our loader string to remote memory (%p len:%lld)", GRN, (void *)current_offset, myself_length);
-    current_offset = poke(mbts_pid, current_offset, myself, myself_length);
+    current_offset = poke(pid, current_offset, myself, myself_length);
 
 #if DEBUG
-    peek_debug(mbts_pid, target_addr, DEBUG_PEEK);
+    peek_debug(pid, target_addr, DEBUG_PEEK);
 #endif
     void *loader_addr = &payload_loader;
     print_line("injecting loader (%p)", GRN, loader_addr);
-    poke(mbts_pid, (target_addr + CHUNKSIZE), loader_addr, CHUNKSIZE);
+    poke(pid, (target_addr + CHUNKSIZE), loader_addr, CHUNKSIZE);
 
 #if DEBUG
-    peek_debug(mbts_pid, (target_addr + CHUNKSIZE), DEBUG_PEEK);
+    peek_debug(pid, (target_addr + CHUNKSIZE), DEBUG_PEEK);
 #endif
 
     /*
@@ -223,45 +197,89 @@ int main(int argc, char *argv[])
     print_line("pointing rip to payload at %p", GRN, future_rip);
     // move instruction pointner to payload
     regs.rip = future_rip; // rip = offset of future payload
-    ptrace(PTRACE_SETREGS, mbts_pid, NULL, &regs);
+    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
 #if 0
     for(int s = 0;s < 30; s++) {
-        single_step_debug(mbts_pid);
+        single_step_debug(pid);
     }
 #endif
-    
-    print_line("continuing target prcocess (%ld)", GRN, mbts_pid);
-    ptrace(PTRACE_CONT, mbts_pid, NULL, NULL);
-    waitpid(mbts_pid, &mbts_status, WUNTRACED); // catch SIGTRAP from 0x3
+
+    print_line("continuing target process (%ld)", GRN, pid);
+    ptrace(PTRACE_CONT, pid, NULL, NULL);
+    waitpid(pid, &mbts_status, WUNTRACED); // catch SIGTRAP from 0x3
 
     if (WIFSTOPPED(mbts_status) && WSTOPSIG(mbts_status) == SIGTRAP)
     {
         print_line("SIGTRAP recieved", GRN); // SIG 0x5
-        ptrace(PTRACE_GETREGS, mbts_pid, NULL, &regs);
+        ptrace(PTRACE_GETREGS, pid, NULL, &regs);
 
         print_line("dlopen returned status %lx", GRN, regs.rax);
-
     }
     else
     {
 
         print_line("something went wrong, we recieved status %d", RED, WSTOPSIG(mbts_status));
 
-#if 1
-        dump_state(mbts_pid, (void *)future_rip);
+#if DEBUG
+        dump_state(pid, (void *)future_rip);
 #endif
     }
 
     // restore memory of our target
-    poke(mbts_pid, target_addr, block_backup, MEMBLOCKSIZE);
+    poke(pid, target_addr, block_backup, MEMBLOCKSIZE);
 
     // restore regs
-    ptrace(PTRACE_SETREGS, mbts_pid, NULL, &backup_regs);
+    ptrace(PTRACE_SETREGS, pid, NULL, &backup_regs);
 
-    ptrace(PTRACE_DETACH, mbts_pid, NULL, NULL);
+    ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
     print_line("mission accomplished", CYN);
+    exit(0);
+}
 
-    return 0;
+void stage_two(pid_t pid)
+{
+
+    // fork and spawn a debugger child which debugs the main thread and
+    // controls execution
+    if (fork() == 0)
+    {
+        // here we are in the new child
+        print_line("spawned debug child (pid: %d)", GRN, getpid());
+
+        //find out who we are
+        char myself[BUFSIZ];
+
+        if (!readlink("/proc/self/exe", myself, BUFSIZ))
+        {
+            print_line("readlink failed!", RED);
+            exit(1);
+        }
+
+        print_line("whoami (%s)", GRN, myself);
+
+        // extract symbol location from .symtbl (not present in the mem image)
+        long unsigned symbol_offset = get_offset_from_elf(myself, MY_TARGET_FUNC);
+
+        if (symbol_offset == 0)
+        {
+            print_line("no offset found", RED);
+            exit(0);
+        }
+
+        print_line("symbol offset %p", GRN, (void *)symbol_offset);
+
+        long unsigned target_image = proc_get_base(pid);
+
+        long unsigned func_offset = target_image + symbol_offset;
+
+        print_line("function offset %p ", GRN, func_offset);
+
+        // enter the debug monitor
+        spawn_debug_monitor(pid, func_offset);
+    }
+
+    // we are done in the main thread
+    print_line("done (%d).", GRN, getpid());
 }

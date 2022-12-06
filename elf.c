@@ -57,9 +57,9 @@ unsigned long get_offset_from_elf(char *filename, char *symbol_needle)
         exit(0);
     }
 
-    print_line("Entrypoint: %x", GRN, elf_hdr.e_entry);
-    print_line("Program header table file offset: %x", GRN, elf_hdr.e_phoff);
-    print_line("Section header table file offset: %x", GRN, elf_hdr.e_shnum);
+    print_line("entrypoint: %x", GRN, elf_hdr.e_entry);
+    print_line("program header table file offset: %x", GRN, elf_hdr.e_phoff);
+    print_line("section header table file offset: %x", GRN, elf_hdr.e_shnum);
 
     for (int i = 0; i < elf_hdr.e_shnum; i++)
     {
@@ -100,6 +100,7 @@ unsigned long get_offset_from_elf(char *filename, char *symbol_needle)
 
     // we found no symbol table, let's use the dynamic one
     if(!found_sym_tbl) {
+        print_line("no .symtbl, using .dynsym", BLU);
         sym_tbl = dyn_sym_tbl;
     }
 
@@ -136,7 +137,7 @@ unsigned long get_offset_from_elf(char *filename, char *symbol_needle)
 
                 fseek(fp, (string_tbl[k].sh_offset + symbol.st_name), SEEK_SET);
 
-                int ret = fread(symbol_name, 128, 1, fp);
+                fread(symbol_name, 128, 1, fp);
                 
 #if DEBUG               
                 if(ret != 0) {
@@ -149,7 +150,7 @@ unsigned long get_offset_from_elf(char *filename, char *symbol_needle)
                 if (strstr(symbol_name, symbol_needle) != NULL)
                 {
 
-#if 0
+#if DEBUG
                     print_line("st_name\t=\t%x", BLU, symbol.st_name);
                     print_line("st_info\t=\t%d", BLU, symbol.st_info);
                     print_line("st_other\t=\t%d", BLU, symbol.st_other);

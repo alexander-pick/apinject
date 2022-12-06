@@ -42,8 +42,9 @@ void dump_state(pid_t pid, void *addr)
     print_line("r15: %16lx rcx: %16lx ", RED, regs.r15, regs.rcx);
     print_line("rax: %16lx rdx: %16lx ", RED, regs.rax, regs.rdx);
 
+#if DEBUG
     char line[BUFSIZ];
-
+    
     FILE *fd = proc_open(pid);
     while (fgets(line, BUFSIZ, fd) != NULL)
     {
@@ -51,6 +52,7 @@ void dump_state(pid_t pid, void *addr)
     }
     fclose(fd);
 
+#endif
     peek_debug(pid, regs.rip, 256);
 
 }

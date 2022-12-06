@@ -23,5 +23,7 @@ FILE *proc_open(pid_t pid);
 
 //proc
 int proc_get_pid(const char *needle, bool ourself);
-unsigned long proc_get_image(pid_t pid, const char *image_name, int skip, bool end);
 void* proc_get_libc_name(pid_t pid);
+
+unsigned long proc_get_image(pid_t pid, const char *image_name, int skip, bool end);
+unsigned long proc_get_base(pid_t pid);

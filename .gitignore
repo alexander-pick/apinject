@@ -1,0 +1,6 @@
+*.o
+*.txt
+apinject
+mock/testsrv
+.vscode/*
+

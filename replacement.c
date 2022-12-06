@@ -36,6 +36,6 @@ void steal_execution(struct user_regs_struct regs)
     */
 
     unsigned long param_1 = regs.rdi; // param 1
-
-    printf("param 1: %ld\n", param_1);
+    printf("Hello from the hook!\n");
+    printf("func param 1: %ld\n", param_1);
 }

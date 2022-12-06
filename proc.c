@@ -187,8 +187,9 @@ unsigned long proc_get_image(pid_t pid, const char *image_name, int skip, bool e
     {
         sscanf(line, "%p-%p %s %*s %*s %*d", &addr, &addr_end, perms);
 
-
-        if (strstr(perms, "x") != NULL)
+        // FIXME: this is a possible bug, if the path contains this string and the 
+        // page is not a x page the tool will fail, xp is better than x thought
+        if (strstr(perms, "xp") != NULL)
         {
             if (skip)
             {
@@ -196,6 +197,7 @@ unsigned long proc_get_image(pid_t pid, const char *image_name, int skip, bool e
                 print_line("skipping page", BLU);
                 continue;
             }
+
             // in case we match a name
             if (image_name != "")
             {
@@ -223,6 +225,28 @@ unsigned long proc_get_image(pid_t pid, const char *image_name, int skip, bool e
     print_line("%s: error finding page", RED, image_name);
 
     fclose(fd);
+    exit(1);  // terminating, this is fatal
+    return 0; // never reached
+}
+
+unsigned long proc_get_base(pid_t pid)
+{
+
+    char line[BUFSIZ];
+
+    void *addr;
+
+    FILE *fd = proc_open(pid);
+
+    if(fgets(line, BUFSIZ, fd) != NULL)
+    {
+        sscanf(line, "%p-%*p %*s %*s %*s %*d", &addr);
+#if DEBUG
+        print_line("%s", YEL, line);
+#endif
+        return (unsigned long)addr;
+    }     
+    
     exit(1);  // terminating, this is fatal
     return 0; // never reached
 }

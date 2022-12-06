@@ -141,6 +141,11 @@ void spawn_debug_monitor(pid_t target, unsigned long breakpoint)
 
     poke(target, breakpoint, int3_opcode, word_length);
 
+#if DEBUG
+    peek_debug(target, breakpoint, DEBUG_PEEK);
+#endif
+
+    print_line("continuing target process (%ld)", GRN, target);
     ptrace(PTRACE_CONT, target, NULL, 0);
 
     while (1)
@@ -151,7 +156,6 @@ void spawn_debug_monitor(pid_t target, unsigned long breakpoint)
         if (WIFSTOPPED(status) &&
             WSTOPSIG(status) == SIGTRAP)
         {
-
             if (current_pid != target)
             {
                 continue;

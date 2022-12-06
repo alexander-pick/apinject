@@ -34,28 +34,13 @@ void *local__dlopen(const char *name, int mode) {
    return __libc_dlopen_mode(name, mode);
 }
 #else
-void *(*hidden_libc_dlopen_mode)(const char *__file, int __mode) __THROWNL;
+extern void *dlopen(const char *name, int mode);
 
 void *local__dlopen(const char *name, int mode) {
-#if 1    
-    print_line("calling dlopen", YEL);
+#if DEBUG    
+    print_line("calling dlopen (glib =<2.34", YEL);
 #endif
-    pid_t target_pid = proc_get_pid(MY_TARGET, false);
-
-    print_line("pid: %d", YEL, target_pid);
-    
-    char *filename = (char *)proc_get_libc_name(target_pid);
-
-    print_line("filename: %s", YEL, filename);
-    
-    unsigned long dlopen_addr = get_offset_from_elf(filename, "dlopen");
-
-    print_line("dlopen: %p", YEL, dlopen_addr);
-
-    hidden_libc_dlopen_mode = (void *)dlopen_addr;
-
-    print_line("calling __libc_dlopen_mode at %p", YEL, *hidden_libc_dlopen_mode);
-    return (hidden_libc_dlopen_mode)(name, mode);
+   return dlopen(name, mode);
 }
 #endif
 

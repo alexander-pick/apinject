@@ -19,15 +19,13 @@
 # it loads our code as library to the target adress space, hammer and chisel implementation
 
 .intel_syntax noprefix
-
-#.section 
-.text                          # text section
-#.align 2;
-.global payload_loader                  # create global symbol
-#.type _ayload_loader, @function         # created symbol is a function
 # This is x86-64 code!
 
-# debug by using this (gdb won't work as we use ptrace):
+.text
+.global payload_loader                  # create global symbol
+.type payload_loader, @function         # created symbol is a function
+
+# can be debugged by using this (gdb won't work as we use ptrace):
 # export LD_DEBUG=all
 
 .macro pushaq

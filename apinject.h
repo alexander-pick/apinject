@@ -52,13 +52,11 @@
 #include "dlfunc.h"
 #include "debug.h"
 
-#include <dlfcn.h>
-
 #define MY_VERSION "v0.1"
 #define MY_TARGET "testsrv"
 #define MY_TARGET_FUNC "second_function"
 
-#define IS_WARRIOR 0
+#define IS_WARRIOR 1
 #define DEBUG 0
 
 #define LIBCSTR "libc"
@@ -78,7 +76,5 @@
 #define CYN "\x1B[36m"
 #define WHT "\x1B[37m"
 #define RESET "\x1B[0m"
-
-void __attribute__((__constructor__)) we_are_in(void);
 
 #endif // HEADER_H
