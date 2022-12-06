@@ -3,10 +3,11 @@
 CC = gcc
 
 asmflags =  -O0 -nostartfiles --entry payload_loader -nostdlib -nodefaultlibs -c -m64
+asmflags2 =  -O0 -nostartfiles --entry _entry_point -nostdlib -nodefaultlibs -c -m64
 # asm flags are pretty much set that there is no bloat in the obj
 
-compflags = -fPIC -O0 -c -Wunused-variable -m64
-linkflags = -lc -fPIC -O0 -Wall -m64 -z noexecstack -no-pie -shared -Wl,-e _entry_point 
+compflags = -fPIC -O0 -c -Wunused-variable -m64 -no-pie
+linkflags = -lc -fPIC -O0 -Wall -m64 -z noexecstack -no-pie -shared -Wl,-e_entry_point
 
 # Important params:
 # -fPIC 				- self explanatory 
@@ -24,6 +25,7 @@ linkflags = -lc -fPIC -O0 -Wall -m64 -z noexecstack -no-pie -shared -Wl,-e _entr
 
 all:
 		${CC} $(asmflags) -o injector.o injector.s
+		${CC} $(asmflags2) -o start.o start.S
 		${CC} $(compflags) apinject.c -o apinject.o
 		${CC} $(compflags) print.c -o print.o
 		${CC} $(compflags) proc.c -o proc.o
@@ -32,7 +34,7 @@ all:
 		${CC} $(compflags) replacement.c -o replacement.o 
 		${CC} $(compflags) elf.c -o elf.o
 		${CC} $(compflags) debug.c -o debug.o
-		${CC} $(linkflags) start.s injector.o dlfunc.o print.o proc.o ptrace.o elf.o replacement.o debug.o apinject.o -o apinject
+		${CC} $(linkflags) start.o injector.o dlfunc.o print.o proc.o ptrace.o elf.o replacement.o debug.o apinject.o -o apinject
 clean:
 		rm -f apinject
 		rm -f *.o

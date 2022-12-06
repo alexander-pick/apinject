@@ -33,13 +33,17 @@
 
 _entry_point:
     xor ebp, ebp
-    mov r9, rdx
+    mov r9, rdx                                 # set rtld_fini
     pop rsi
-    and rsp,0xFFFFFFFFFFFFFFF0
+    and rsp,0xFFFFFFFFFFFFFFF0                  # proper align stack
     push rax
     push rsp
-    mov rdi, 0
+    mov rdi, launcher@GOTPCREL[rip]             # handing launcher() as main, otherwise older gcc will build a segfaulting binary
     mov rdx, 0
     mov r8, 0
 	mov rcx, 0
-    call __libc_start_main
+    mov rax, __libc_start_main@GOTPCREL[rip]    # calling __libc_start_main
+    call rax
+    mov rax, 1                                  # exit(0), just in case, should never return here
+    mov rbx, 0
+    int 0x80

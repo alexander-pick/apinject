@@ -30,8 +30,8 @@ const char interp_path[] __attribute__((section(".interp"))) = "/lib64/ld-linux-
     stage two: constructor run after dlopen loaded the binary into the target
 */
 
-static void launcher() __attribute__((__constructor__));
-static void launcher()
+void launcher() __attribute__((__constructor__));
+void launcher()
 {
     pid_t pid = proc_get_pid(MY_TARGET, false);
 
@@ -45,6 +45,13 @@ static void launcher()
     {
         stage_one();
     }
+}
+
+/*
+    this is "main()"
+*/ 
+int kickstarter() {
+    launcher();
 }
 
 // extern for asm stub
